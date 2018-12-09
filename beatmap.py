@@ -31,18 +31,23 @@ def mk_beatmap(path, *parts):
             p.serialize(f)
 
 import numpy as np
-import numpy.rfft as rfft
+import numpy.fft as rfft
 
-def next_hits(buf, rate, duration, channels, prev):
+def next_hits(buf, rate, duration, channels, prev, prev_max_p):
+    #TODO: is the number of channels a good heuristic on notes?
+    P_DROPOFF = 100 #TODO: tune
+    MIN_P = 100 #TODO: tune
+
     data = np.frombuffer(buf, dtype=np.int16)
+    #f is the note and p it's "volume" (I think it's actually like decibels)
     p = 20 * np.log10(np.abs(rfft.rfft(data)))
+    #TODO: standardise length?
     f = np.linspace(0, rate/2, len(p))
-    sorted_idx = sorted(list(range(len(p))), key = lambda i: p[i])
-    sorted_f = [f[i] for i in sorted_idx]
+    freq_to_vol = dict(zip(f, p))
 
-    pop_idx = 0
-    new_chans = []
-    for channel, note in enumerate(prev):
-        if note == None:
-            new_chans.append(sorted_idx[pop_idx])
-            pop_idx += 1
+    max_p = p.max()
+    if prev_max_p - max_p >= P_DROPOFF or max_p < MIN_P:
+        return max_p, [None for i in range(channels)]
+
+    #grab all the notes from the last state that are still playing
+    still_playing = filter(lambda i: freq_to_vol[i] > MIN_P, range(channels))
