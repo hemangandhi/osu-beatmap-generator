@@ -44,35 +44,53 @@ def mk_default_metadata(audio_file, lead_in, mode, title, artist, map_id, map_se
 import numpy as np
 import numpy.fft as rfft
 
+def flat_map_file(file, split=2):
+    for buf in file:
+        data = np.frombuffer(buf, dtype=np.int16)
+        yield from np.array_split(data, split)
+
+def bag_notes(buf, rate):
+    NOTE_TOLERANCE = 1
+
+    data = buf
+    #f is the note and p it's "volume" (I think it's actually like decibels)
+    p = 20 * np.log10(np.abs(rfft.rfft(data)))
+    max_p = p.max()
+    f = np.linspace(0, rate/2, len(p))
+
+    freq_to_vol = dict()
+    last_note = f[0] - NOTE_TOLERANCE
+    for note, vol in zip(f, p):
+        if abs(last_note - note) < NOTE_TOLERANCE:
+            freq_to_vol[last_note] = max(freq_to_vol[last_note], vol)
+        else:
+            freq_to_vol[note] = vol
+            last_note = note
+
+    return freq_to_vol, max_p
+
+
 def next_hits(buf, rate, prev, prev_max_p):
     #TODO: is the number of channels a good heuristic on notes?
     P_DROPOFF = 10 #TODO: tune
     MIN_P = 0 #TODO: tune
 
-    data = np.frombuffer(buf, dtype=np.int16)
-    #f is the note and p it's "volume" (I think it's actually like decibels)
-    p = 20 * np.log10(np.abs(rfft.rfft(data)))
-    #TODO: standardise length?
-    f = np.linspace(0, rate/2, len(p))
-    freq_to_vol = dict(zip(f, p))
+    freq_to_vol, max_p = bag_notes(buf, rate)
 
-    max_p = p.max()
     if (prev_max_p is not None and prev_max_p - max_p >= P_DROPOFF) or max_p < MIN_P:
         return max_p, [None for i in prev]
 
     #grab all the notes from the last state that are still playing
-    still_playing = list(filter(lambda i: prev[i] is not None and freq_to_vol[prev[i]] > MIN_P, range(len(prev))))
-    left_over = [n for i, n in enumerate(f) if i not in still_playing and freq_to_vol[n] > MIN_P]
-    sorted_remains = sorted(left_over, key=lambda n: freq_to_vol[n], reverse=True)
+    sorted_notes = sorted(list(freq_to_vol.keys()), key=lambda n: freq_to_vol[n], reverse=True)
 
     chans = []
     rem_idx = 0
     for i, n in enumerate(prev):
-        if i in still_playing:
+        if n in sorted_notes[:len(prev)]:
             chans.append(n)
-        elif n is None and rem_idx < len(sorted_remains):
+        elif n is None and rem_idx < len(sorted_notes):
             #TODO: may be add a threshold
-            chans.append(sorted_remains[rem_idx])
+            chans.append(sorted_notes[rem_idx])
             rem_idx += 1
         else:
             chans.append(None)

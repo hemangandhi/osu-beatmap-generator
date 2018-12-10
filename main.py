@@ -15,7 +15,7 @@ def handle_file(path, out_path, channels):
             print(tbm[-1])
             return tbm + [bm.next_hits(buf, rate, tbm[-1][1], tbm[-1][0])]
         #TODO: it might make sense to concat the buffers, depending on the time/buffer...
-        note_states = reduce(reducer, f, [(None, [None for i in range(chan)])])
+        note_states = reduce(reducer, bm.flat_map_file(f), [(None, [None for i in range(chan)])])
 
     just_notes = [n[1] for n in note_states]
     sample_len = duration / len(just_notes)
