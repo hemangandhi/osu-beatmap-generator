@@ -49,26 +49,40 @@ def flat_map_file(file, split=2):
         data = np.frombuffer(buf, dtype=np.int16)
         yield from np.array_split(data, split)
 
+def bag_notes(buf, rate):
+    NOTE_TOLERANCE = 1
+
+    data = buf
+    #f is the note and p it's "volume" (I think it's actually like decibels)
+    p = 20 * np.log10(np.abs(rfft.rfft(data)))
+    max_p = p.max()
+    f = np.linspace(0, rate/2, len(p))
+
+    freq_to_vol = dict()
+    for note, vol in zip(f, p):
+        for known_note in freq_to_vol:
+            if abs(known_note - note) < NOTE_TOLERANCE:
+                freq_to_vol[known_note] = max(freq_to_vol[known_note], vol)
+                break
+        else:
+            freq_to_vol[note] = vol
+
+    return freq_to_vol, max_p
+
+
 def next_hits(buf, rate, prev, prev_max_p):
     #TODO: is the number of channels a good heuristic on notes?
     P_DROPOFF = 10 #TODO: tune
     MIN_P = 0 #TODO: tune
 
-    data = buf
-    #f is the note and p it's "volume" (I think it's actually like decibels)
-    p = 20 * np.log10(np.abs(rfft.rfft(data)))
-    #TODO: standardise length?
-    f = np.linspace(0, rate/2, len(p))
-    freq_to_vol = dict(zip(f, p))
+    freq_to_vol, max_p = bag_notes(buf, rate)
 
-    max_p = p.max()
     if (prev_max_p is not None and prev_max_p - max_p >= P_DROPOFF) or max_p < MIN_P:
         return max_p, [None for i in prev]
 
     #grab all the notes from the last state that are still playing
-    sorted_notes = sorted(f, key=lambda n: freq_to_vol[n], reverse=True)
+    sorted_notes = sorted(list(freq_to_vol.keys()), key=lambda n: freq_to_vol[n], reverse=True)
     is_still_playing = lambda i: prev[i] is not None and\
-            prev[i] in freq_to_vol and\
             0 <= sorted_notes.index(prev[i]) < len(prev)
     still_playing = list(filter(is_still_playing, range(len(prev))))
 
