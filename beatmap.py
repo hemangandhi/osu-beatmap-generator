@@ -44,12 +44,17 @@ def mk_default_metadata(audio_file, lead_in, mode, title, artist, map_id, map_se
 import numpy as np
 import numpy.fft as rfft
 
+def flat_map_file(file, split=2):
+    for buf in file:
+        data = np.frombuffer(buf, dtype=np.int16)
+        yield from np.array_split(data, split)
+
 def next_hits(buf, rate, prev, prev_max_p):
     #TODO: is the number of channels a good heuristic on notes?
     P_DROPOFF = 10 #TODO: tune
     MIN_P = 0 #TODO: tune
 
-    data = np.frombuffer(buf, dtype=np.int16)
+    data = buf
     #f is the note and p it's "volume" (I think it's actually like decibels)
     p = 20 * np.log10(np.abs(rfft.rfft(data)))
     #TODO: standardise length?
@@ -61,18 +66,20 @@ def next_hits(buf, rate, prev, prev_max_p):
         return max_p, [None for i in prev]
 
     #grab all the notes from the last state that are still playing
-    still_playing = list(filter(lambda i: prev[i] is not None and freq_to_vol[prev[i]] > MIN_P, range(len(prev))))
-    left_over = [n for i, n in enumerate(f) if i not in still_playing and freq_to_vol[n] > MIN_P]
-    sorted_remains = sorted(left_over, key=lambda n: freq_to_vol[n], reverse=True)
+    sorted_notes = sorted(f, key=lambda n: freq_to_vol[n], reverse=True)
+    is_still_playing = lambda i: prev[i] is not None and\
+            prev[i] in freq_to_vol and\
+            0 <= sorted_notes.index(prev[i]) < len(prev)
+    still_playing = list(filter(is_still_playing, range(len(prev))))
 
     chans = []
     rem_idx = 0
     for i, n in enumerate(prev):
         if i in still_playing:
             chans.append(n)
-        elif n is None and rem_idx < len(sorted_remains):
+        elif n is None and rem_idx < len(sorted_notes):
             #TODO: may be add a threshold
-            chans.append(sorted_remains[rem_idx])
+            chans.append(sorted_notes[rem_idx])
             rem_idx += 1
         else:
             chans.append(None)
