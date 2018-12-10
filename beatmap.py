@@ -1,6 +1,6 @@
 
 class FilePart:
-    def __init__(self, part_name, **params):
+    def __init__(self, name, **params):
         self.params = params
         self.name = name
     def __iter__(self):
@@ -10,18 +10,18 @@ class FilePart:
     def __setitem__(self, item, val):
         self.params[item] = val
     def serialize(self, file):
-        file.writeLine("[{}]".format(self.name))
+        file.write("[{}]\n".format(self.name))
         for p in self:
-            file.writeLine("{}: {}".format(p, self[p]))
+            file.write("{}: {}\n".format(p, self[p]))
 
 class CSVPart(FilePart):
     def __init__(self, name, *pts):
-        super(self, name)
+        FilePart.__init__(self, name)
         self.points = list(pts)
     def serialize(self, file):
-        super.serialize(self, file)
+        FilePart.serialize(self, file)
         for pt in self.points:
-            file.writeLine(",".join(map(str, pt)))
+            file.write(",".join(map(str, pt)) + '\n')
     def add_row(self, idx, row):
         self.points.insert(idx, row)
 
@@ -46,8 +46,8 @@ import numpy.fft as rfft
 
 def next_hits(buf, rate, prev, prev_max_p):
     #TODO: is the number of channels a good heuristic on notes?
-    P_DROPOFF = 100 #TODO: tune
-    MIN_P = 100 #TODO: tune
+    P_DROPOFF = 10 #TODO: tune
+    MIN_P = 0 #TODO: tune
 
     data = np.frombuffer(buf, dtype=np.int16)
     #f is the note and p it's "volume" (I think it's actually like decibels)
@@ -61,9 +61,9 @@ def next_hits(buf, rate, prev, prev_max_p):
         return max_p, [None for i in prev]
 
     #grab all the notes from the last state that are still playing
-    still_playing = list(filter(lambda i: freq_to_vol[prev[i]] > MIN_P, range(len(prev))))
+    still_playing = list(filter(lambda i: prev[i] is not None and freq_to_vol[prev[i]] > MIN_P, range(len(prev))))
     left_over = [n for i, n in enumerate(f) if i not in still_playing and freq_to_vol[n] > MIN_P]
-    sorted_remains = sorted(left_over, lambda n: freq_to_vol[n], reverse=True)
+    sorted_remains = sorted(left_over, key=lambda n: freq_to_vol[n], reverse=True)
 
     chans = []
     rem_idx = 0

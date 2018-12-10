@@ -5,13 +5,17 @@ import audioread as au
 
 import beatmap as bm
 
-def handle_file(path, out_path):
+def handle_file(path, out_path, channels):
     with au.audio_open(path) as f:
-        chan = f.channels
+        chan = channels or f.channels
         rate = f.samplerate
         duration = f.duration
+
+        def reducer(tbm, buf):
+            print(tbm[-1])
+            return tbm + [bm.next_hits(buf, rate, tbm[-1][1], tbm[-1][0])]
         #TODO: it might make sense to concat the buffers, depending on the time/buffer...
-        note_states = reduce(lambda tbm, buf: tbm + bm.next_beatmap(buf, rate, tbm[-1][1], tbm[-1][0]), [(None, [None for i in range(chan)])], f)
+        note_states = reduce(reducer, f, [(None, [None for i in range(chan)])])
 
     just_notes = [n[1] for n in note_states]
     sample_len = duration / len(just_notes)
@@ -23,14 +27,18 @@ def handle_file(path, out_path):
             #this heavily assumes that something isn't held down twice "in a row"
             #for different notes.
             if down_hits[i] is None and n is not None:
-                down_hits[i] = time
+                down_hits[i] = int(time)
             elif down_hits[i] is not None and n is None:
-                hits.append((i, down_hits[i], time))
+                hits.append((i, down_hits[i], int(time)))
                 down_hits[i] = None
             time += sample_len
 
     col_width = 512/chan
-    beatmap_hits = map(lambda x: (x[0] * col_width + col_width / 2, 0, x[1], 128, 0, x[2]), hits)
+    beatmap_hits = map(lambda x: (int(x[0] * col_width + col_width / 2), 0, x[1], 128, 0, x[2]), hits)
     hit_objs = bm.CSVPart("Hit Objects", *beatmap_hits)
-    default = bm.mk_default_metadata(path, 0, 3, "Auto beatmap for:" + path, "", "", "")
-    bm.mk_beatmap(out_path, default + [hit_objs])
+    default = bm.mk_default_metadata(path, 0, 3, "Auto beatmap for " + path, "", "", "")
+    bm.mk_beatmap(out_path, *(default + [hit_objs]))
+
+if __name__ == "__main__":
+    import sys
+    handle_file("tests/carol-of-the-bells.mp3", "out.osu", sys.argv[1] if len(sys.argv) >= 2 else 4)
