@@ -59,13 +59,13 @@ def bag_notes(buf, rate):
     f = np.linspace(0, rate/2, len(p))
 
     freq_to_vol = dict()
+    last_note = f[0] - NOTE_TOLERANCE
     for note, vol in zip(f, p):
-        for known_note in freq_to_vol:
-            if abs(known_note - note) < NOTE_TOLERANCE:
-                freq_to_vol[known_note] = max(freq_to_vol[known_note], vol)
-                break
+        if abs(last_note - note) < NOTE_TOLERANCE:
+            freq_to_vol[last_note] = max(freq_to_vol[last_note], vol)
         else:
             freq_to_vol[note] = vol
+            last_note = note
 
     return freq_to_vol, max_p
 
@@ -82,14 +82,11 @@ def next_hits(buf, rate, prev, prev_max_p):
 
     #grab all the notes from the last state that are still playing
     sorted_notes = sorted(list(freq_to_vol.keys()), key=lambda n: freq_to_vol[n], reverse=True)
-    is_still_playing = lambda i: prev[i] is not None and\
-            0 <= sorted_notes.index(prev[i]) < len(prev)
-    still_playing = list(filter(is_still_playing, range(len(prev))))
 
     chans = []
     rem_idx = 0
     for i, n in enumerate(prev):
-        if i in still_playing:
+        if n in sorted_notes[:len(prev)]:
             chans.append(n)
         elif n is None and rem_idx < len(sorted_notes):
             #TODO: may be add a threshold
