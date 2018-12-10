@@ -1,0 +1,32 @@
+[General]
+AudioFilename: tests/carol-of-the-bells.mp3
+Mode: 3
+AudioLeadIn: 0
+[Editor]
+[Metadata]
+Title: Auto beatmap for tests/carol-of-the-bells.mp3
+Creator: Osu! Beat Gen
+BeatmapID: 
+BeatmapSetID: 
+Artist: 
+[Difficulty]
+[Events]
+[Timing Points]
+[Colours]
+[Hit Objects]
+64,0,1,128,0,337
+192,0,1,128,0,337
+320,0,1,128,0,337
+448,0,1,128,0,337
+64,0,337,128,0,338
+192,0,337,128,0,338
+320,0,337,128,0,338
+448,0,337,128,0,338
+64,0,338,128,0,339
+192,0,338,128,0,339
+320,0,338,128,0,339
+448,0,338,128,0,339
+64,0,339,128,0,340
+192,0,339,128,0,340
+320,0,339,128,0,341
+448,0,339,128,0,341
