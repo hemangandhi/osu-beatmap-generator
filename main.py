@@ -9,7 +9,7 @@ def handle_file(path, out_path, channels):
     with au.audio_open(path) as f:
         chan = channels or f.channels
         rate = f.samplerate
-        duration = f.duration
+        duration = f.duration * 1000
 
         def reducer(tbm, buf):
             print(tbm[-1])
@@ -19,6 +19,8 @@ def handle_file(path, out_path, channels):
 
     just_notes = [n[1] for n in note_states]
     sample_len = duration / len(just_notes)
+    print(sample_len)
+    print(1/sample_len)
     time = sample_len / 2
     hits = []
     down_hits = [None for i in range(chan)]
@@ -41,4 +43,4 @@ def handle_file(path, out_path, channels):
 
 if __name__ == "__main__":
     import sys
-    handle_file("tests/carol-of-the-bells.mp3", "out.osu", sys.argv[1] if len(sys.argv) >= 2 else 4)
+    handle_file("tests/a-ha - Take On Me (Official Music Video).mp3", "out.osu", sys.argv[1] if len(sys.argv) >= 2 else 4)
