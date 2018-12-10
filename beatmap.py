@@ -30,10 +30,21 @@ def mk_beatmap(path, *parts):
         for p in parts:
             p.serialize(f)
 
+def mk_default_metadata(audio_file, lead_in, mode, title, artist, map_id, map_set):
+    general = FilePart("General", **{"AudioFilename": audio_file, "AudioLeadIn": lead_in, "Mode": mode})
+    editor = FilePart("Editor")
+    metadata = FilePart("Metadata", **{"Title": title, "Artist": artist, "Creator": "Osu! Beat Gen", "BeatmapID": map_id, "BeatmapSetID": map_set})
+    #TODO: tune
+    difficulty = FilePart("Difficulty")
+    events = FilePart("Events")
+    tp = CSVPart("Timing Points")
+    colors = FilePart("Colours")
+    return [general, editor, metadata, difficulty, events, tp, colors]
+
 import numpy as np
 import numpy.fft as rfft
 
-def next_hits(buf, rate, duration, channels, prev, prev_max_p):
+def next_hits(buf, rate, prev, prev_max_p):
     #TODO: is the number of channels a good heuristic on notes?
     P_DROPOFF = 100 #TODO: tune
     MIN_P = 100 #TODO: tune
@@ -46,8 +57,23 @@ def next_hits(buf, rate, duration, channels, prev, prev_max_p):
     freq_to_vol = dict(zip(f, p))
 
     max_p = p.max()
-    if prev_max_p - max_p >= P_DROPOFF or max_p < MIN_P:
-        return max_p, [None for i in range(channels)]
+    if (prev_max_p is not None and prev_max_p - max_p >= P_DROPOFF) or max_p < MIN_P:
+        return max_p, [None for i in prev]
 
     #grab all the notes from the last state that are still playing
-    still_playing = filter(lambda i: freq_to_vol[i] > MIN_P, range(channels))
+    still_playing = list(filter(lambda i: freq_to_vol[prev[i]] > MIN_P, range(len(prev))))
+    left_over = [n for i, n in enumerate(f) if i not in still_playing and freq_to_vol[n] > MIN_P]
+    sorted_remains = sorted(left_over, lambda n: freq_to_vol[n], reverse=True)
+
+    chans = []
+    rem_idx = 0
+    for i, n in enumerate(prev):
+        if i in still_playing:
+            chans.append(n)
+        elif n is None and rem_idx < len(sorted_remains):
+            #TODO: may be add a threshold
+            chans.append(sorted_remains[rem_idx])
+            rem_idx += 1
+        else:
+            chans.append(None)
+    return max_p, chans
