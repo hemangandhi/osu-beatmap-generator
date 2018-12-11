@@ -84,12 +84,16 @@ def next_hits(buf, rate, prev, prev_max_p):
     sorted_notes = sorted(list(freq_to_vol.keys()), key=lambda n: freq_to_vol[n], reverse=True)
 
     chans = []
+    used_idx = []
     rem_idx = 0
     for i, n in enumerate(prev):
-        if n in sorted_notes[:len(prev)]:
+        if n in sorted_notes[rem_idx:len(prev)]:
             chans.append(n)
+            used_idx.append(sorted_notes.index(n))
         elif n is None and rem_idx < len(sorted_notes):
             #TODO: may be add a threshold
+            while rem_idx in used_idx:
+                rem_idx += 1
             chans.append(sorted_notes[rem_idx])
             rem_idx += 1
         else:
